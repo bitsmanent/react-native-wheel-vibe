@@ -1,6 +1,6 @@
 {
   "name": "react-native-wheel-vibe",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A high-performance, UI-thread native 3D wheel picker",
   "main": "react-native-wheel-vibe.js",
   "files": [
