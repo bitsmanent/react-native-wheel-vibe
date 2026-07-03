@@ -1,0 +1,20 @@
+{
+  "name": "@bitsmanent/react-native-wheel-vibe",
+  "version": "1.0.0",
+  "description": "A high-performance, UI-thread native 3D wheel picker",
+  "main": "react-native-wheel-vibe.js",
+  "files": [
+    "react-native-wheel-vibe.js",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bitsmanent/react-native-wheel-vibe.git"
+  },
+  "keywords": [],
+  "author": "Claudio Alessi <smoppy@gmail.com>",
+  "license": "MIT"
+}
