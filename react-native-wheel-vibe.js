@@ -251,11 +251,9 @@ export default function WheelPicker({
 			target = Math.max(0, Math.min(itemsCount - 1, selectedIndex));
 		}
 
-		if (Math.abs(current.value - target) >= 0.5) {
-			current.value = withTiming(target, { duration: 250 });
-			setLocalActiveIndex(selectedIndex);
-			lastNotifiedIndex.current = selectedIndex;
-		}
+		current.value = withTiming(target, { duration: 250 });
+		setLocalActiveIndex(selectedIndex);
+		lastNotifiedIndex.current = selectedIndex;
 	}, [selectedIndex, loop, itemsCount, localActiveIndex]);
 
 	const tapGesture = useTapGesture({
