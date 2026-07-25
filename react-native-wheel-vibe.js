@@ -83,7 +83,8 @@ export default function WheelPicker({
 	inertiaDeceleration = 0.998,
 	hapticDebounceMs = HAPTIC_DEBOUNCE_MS,
 	accessibilityLabel = "Wheel picker",
-	getAccessibilityValue
+	getAccessibilityValue,
+	disabled = false
 }) {
 	const itemsCount = items.length;
 	const safeVisibleItems = Math.max(1, visibleItems);
@@ -209,7 +210,7 @@ export default function WheelPicker({
 	);
 
 	useEffect(() => {
-		if (itemsCount <= 0) return;
+		if (itemsCount <= 0 || disabled) return;
 
 		const prevSelectedIndex = prevSelectedIndexRef.current;
 		prevSelectedIndexRef.current = selectedIndex;
@@ -251,15 +252,17 @@ export default function WheelPicker({
 			target = Math.max(0, Math.min(itemsCount - 1, selectedIndex));
 		}
 
-		current.value = withTiming(target, { duration: 250 });
-		setLocalActiveIndex(selectedIndex);
-		lastNotifiedIndex.current = selectedIndex;
+		if (Math.abs(current.value - target) >= 0.5) {
+			current.value = withTiming(target, { duration: 250 });
+			setLocalActiveIndex(selectedIndex);
+			lastNotifiedIndex.current = selectedIndex;
+		}
 	}, [selectedIndex, loop, itemsCount, localActiveIndex]);
 
 	const tapGesture = useTapGesture({
 		onDeactivate: (event) => {
 			'worklet';
-			if (event.canceled || !enableTapToSelect || itemsCount <= 0) return;
+			if (event.canceled || !enableTapToSelect || itemsCount <= 0 || disabled) return;
 
 			const yOffset = event.y - (containerHeight / 2);
 			const clampedRatio = Math.max(-0.999, Math.min(0.999, yOffset / radius));
@@ -274,21 +277,24 @@ export default function WheelPicker({
 				scheduleOnRN(stableOnChange, finalIndex);
 			});
 		}
-	}, [enableTapToSelect, containerHeight, radius, radPerItem, itemsCount, loop, stableOnSetTargetIndex, stableOnTargetIndexChange, stableOnChange]);
+	}, [enableTapToSelect, containerHeight, radius, radPerItem, itemsCount, loop, stableOnSetTargetIndex, stableOnTargetIndexChange, stableOnChange, disabled]);
 
 	const panGesture = usePanGesture({
 		onActivate: () => {
 			'worklet';
+			if (disabled) return;
 			startCurrent.value = current.value;
 			scheduleOnRN(stableOnSetTargetIndex, getClampedIndex(Math.round(current.value), itemsCount, loop));
 		},
 		onUpdate: (event) => {
 			'worklet';
+			if (disabled) return;
 			const nextValue = startCurrent.value - event.translationY / safeItemHeight;
 			current.value = loop ? nextValue : Math.max(0, Math.min(itemsCount - 1, nextValue));
 		},
 		onFinalize: (event) => {
 			'worklet';
+			if (disabled) return;
 			const success = !event.canceled;
 			const indexVelocity = -event.velocityY / safeItemHeight;
 			const finalVelocity = success ? Math.max(-maxVelocityClamp, Math.min(maxVelocityClamp, indexVelocity)) : 0;
@@ -329,7 +335,7 @@ export default function WheelPicker({
 				);
 			}
 		}
-	}, [safeItemHeight, loop, itemsCount, stableOnSetTargetIndex, stableOnTargetIndexChange, stableOnChange, maxVelocityClamp, inertiaDeceleration]);
+	}, [safeItemHeight, loop, itemsCount, stableOnSetTargetIndex, stableOnTargetIndexChange, stableOnChange, maxVelocityClamp, inertiaDeceleration, disabled]);
 
 	const gesture = enableTapToSelect ? useExclusiveGestures(panGesture, tapGesture) : panGesture;
 
@@ -411,12 +417,13 @@ export default function WheelPicker({
 				accessibilityRole="adjustable"
 				accessibilityLabel={accessibilityLabel}
 				accessibilityValue={{ text: activeItemValue }}
-				accessibilityState={{ disabled: itemsCount === 0 }}
+				accessibilityState={{ disabled: itemsCount === 0 || disabled }}
 				accessibilityActions={[
 					{ name: 'increment', label: 'Increment value' },
 					{ name: 'decrement', label: 'Decrement value' }
 				]}
 				onAccessibilityAction={(event) => {
+					if (disabled) return;
 					if (event.nativeEvent.actionName === 'increment') handleAccessibilityAction(1);
 					if (event.nativeEvent.actionName === 'decrement') handleAccessibilityAction(-1);
 				}}

@@ -174,6 +174,7 @@ const styles = StyleSheet.create({
 | `hapticDebounceMs` | `number` | `45` | Minimum duration in milliseconds required between subsequent haptic feedback calls. |
 | `accessibilityLabel` | `string` | `"Wheel picker"` | Root accessibility label for screen readers. |
 | `getAccessibilityValue` | `(item: any, index: number) => string` | `undefined` | Standard formatter to state the value of the active index to accessibility engines. |
+| `disabled` | `boolean` | `false` | When true, disables all gestures and interactions on the wheel. |
 
 ---
 
