@@ -110,6 +110,7 @@ export default function WheelPicker({
 	const startCurrent = useSharedValue(0);
 
 	const [localActiveIndex, setLocalActiveIndex] = useState(initialIndex);
+	const [idleId, setIdleId] = useState(0);
 	const lastNotifiedIndex = useRef(initialIndex);
 	const prevSelectedIndexRef = useRef(selectedIndex);
 
@@ -127,6 +128,16 @@ export default function WheelPicker({
 		targetIndexRef.current = null; // Clear target once animation has fully settled
 		lastNotifiedIndex.current = index;
 		onChangeRef.current?.(index);
+		setIdleId(id => id + 1);
+	}, []);
+
+	const stableOnAnimationFinished = useCallback(({ index, finished }) => {
+		targetIndexRef.current = null;
+		if (finished) {
+			lastNotifiedIndex.current = index;
+			onChangeRef.current?.(index);
+			setIdleId(id => id + 1);
+		}
 	}, []);
 
 	const stableOnActiveIndexChange = useCallback((index) => {
@@ -228,19 +239,11 @@ export default function WheelPicker({
 		}
 
 		// Guard 2: Ignore if the change is a result of our own active gesture or intermediate updates.
-		// Added check on lastNotifiedIndex to mitigate timing misalignment (batching) of React state.
 		if (targetIndexRef.current !== null) {
-			if (
-				selectedIndex === targetIndexRef.current ||
-				selectedIndex === localActiveIndex ||
-				selectedIndex === lastNotifiedIndex.current
-			) {
+			if (selectedIndex === targetIndexRef.current) {
 				return;
 			}
 		}
-
-		// Genuine external programmatic change occurred. Clear gesture state tracking.
-		targetIndexRef.current = null;
 
 		let target = selectedIndex;
 
@@ -252,11 +255,12 @@ export default function WheelPicker({
 			target = Math.max(0, Math.min(itemsCount - 1, selectedIndex));
 		}
 
-		if (Math.abs(current.value - target) >= 0.5) {
-			current.value = withTiming(target, { duration: 250 });
-			setLocalActiveIndex(selectedIndex);
-			lastNotifiedIndex.current = selectedIndex;
-		}
+		// We must unconditionally apply the new target to cancel any ongoing animations
+		// that might be moving away from the target, even if the current value happens
+		// to be close to the target right now.
+		current.value = withTiming(target, { duration: 250 });
+		setLocalActiveIndex(selectedIndex);
+		lastNotifiedIndex.current = selectedIndex;
 	}, [selectedIndex, loop, itemsCount, localActiveIndex]);
 
 	const tapGesture = useTapGesture({
@@ -272,9 +276,9 @@ export default function WheelPicker({
 			scheduleOnRN(stableOnSetTargetIndex, finalIndex);
 			scheduleOnRN(stableOnTargetIndexChange, finalIndex);
 
-			current.value = withSpring(target, SPRING_CONFIG, () => {
+			current.value = withSpring(target, SPRING_CONFIG, (finished) => {
 				'worklet';
-				scheduleOnRN(stableOnChange, finalIndex);
+				scheduleOnRN(stableOnAnimationFinished, { index: finalIndex, finished });
 			});
 		}
 	}, [enableTapToSelect, containerHeight, radius, radPerItem, itemsCount, loop, stableOnSetTargetIndex, stableOnTargetIndexChange, stableOnChange, disabled]);
@@ -300,15 +304,16 @@ export default function WheelPicker({
 			const finalVelocity = success ? Math.max(-maxVelocityClamp, Math.min(maxVelocityClamp, indexVelocity)) : 0;
 
 			if (!success || Math.abs(finalVelocity) < 0.5) {
+				if (!success && Math.abs(current.value - startCurrent.value) < 0.05) return;
 				const target = Math.round(current.value);
 				const finalIndex = getClampedIndex(target, itemsCount, loop);
 
 				scheduleOnRN(stableOnSetTargetIndex, finalIndex);
 				if (success) scheduleOnRN(stableOnTargetIndexChange, finalIndex);
 
-				current.value = withSpring(target, SPRING_CONFIG, () => {
+				current.value = withSpring(target, SPRING_CONFIG, (finished) => {
 					'worklet';
-					if (success) scheduleOnRN(stableOnChange, finalIndex);
+					scheduleOnRN(stableOnAnimationFinished, { index: finalIndex, finished });
 				});
 			} else {
 				current.value = withDecay(
@@ -326,9 +331,9 @@ export default function WheelPicker({
 							scheduleOnRN(stableOnSetTargetIndex, finalIndex);
 							scheduleOnRN(stableOnTargetIndexChange, finalIndex);
 
-							current.value = withSpring(target, SPRING_CONFIG, () => {
+							current.value = withSpring(target, SPRING_CONFIG, (finished) => {
 								'worklet';
-								scheduleOnRN(stableOnChange, finalIndex);
+								scheduleOnRN(stableOnAnimationFinished, { index: finalIndex, finished });
 							});
 						}
 					}
